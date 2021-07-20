@@ -1,0 +1,220 @@
+/**************************************************************
+* CLIENT NAME      : Jiangsu Hengrui
+* PROJECT/STUDY    : SHR-1703-I-101
+* CODE NAME        : 
+* CODE TYPE        : Program
+* FUNCTION         : QC l_adae
+* DATE             : 2021/07/14
+* PROGRAMMER       : Xiaoxia Zhou
+* SOFTWARE/VERTION : SAS/VERSION 9.4
+**************************************************************/
+
+dm output 'clear';
+dm log 'clear' log;
+dm 'next VIEWTABLE:;end;';
+proc datasets nolist memtype=data kill; quit;
+
+%include "&mcrqc.TFL\qc_mtlf.sas";
+
+%let tab=l_adae;
+%let rtfname=l16-02-007-001-adae;
+
+/*proc contents data=adamprt.adae; run;*/
+/*proc contents data=sdtmprt.ae; run;*/
+
+********************************************************
+*  Step 01:  Preparing dataset                         *
+********************************************************;
+
+/* ADaM source data*/
+data adae01(where=(saffl='Y'));
+
+  set adamprt.adae;
+/*  keep saffl subjid trta AESOC AEDECOD AETERM AESTDTC AESTDY AEENDTC AEENDY AEOUT AEREL AEACN AESEV  AECONTRT TRTEMFL AESER  AEDIS ;*/
+  
+run;
+
+proc sql noprint;
+  select distinct subjid into: safpop separated by ' ' from adae01;
+quit;
+%put &safpop;
+
+
+/* SDTM source data*/
+
+data ae01;
+
+  set sdtmprt.ae(keep=usubjid AESOC AEDECOD AETERM AESTDTC AESTDY AEENDTC AEENDY AEOUT AEREL AEACN AESEV  AECONTRT AESER    );
+  subjid = scan(usubjid,6,'-');
+
+ 
+run;
+
+data ae02;
+
+  set ae01;
+  if subjid in (&safpop) then output;
+
+run;
+
+/* Make sure the consistency b/w SDTM and ADaM(merged dataset should have the same obs as their souce datasets)*/
+
+proc sort data=ae02; by subjid aesoc aedecod aeterm; run;
+proc sort data=adae01; by subjid aesoc aedecod aeterm; run;
+
+data merged;
+
+  merge ae02(in=a)
+        adae01(in=b);
+  by subjid aesoc aedecod aeterm;
+
+run;
+
+
+********************************************************
+*  Step 02: Alignment with main site programming       *
+********************************************************;
+
+data final01;
+
+  set merged;
+
+  array misn _number_;
+  do over misn;
+    if missing(misn) then misn='-';
+  end;
+
+  array misc _character_;
+  do over misc;
+    if missing(misc) then misc='-';
+  end;
+
+  if aeout='-' then aeout='';
+  if aerel='-' then aerel='';
+  if aeacn='-' then aeacn='';
+  if aesev='-' then aesev='';
+  if aecontrt='Y' then aecontrt='是'; else aecontrt='否';
+  if trtemfl='Y' then trtemfl='是'; else trtemfl='否';
+  if aeser='-' then aeser='否';
+  if aedis='-' then aedis='否';
+run;
+
+data final02;
+
+  set final01;;
+  col1=put(subjid,best.);
+  col2=trta;
+  col3=cats(aesoc,'/',aedecod,'/',aeterm);
+  col4=cats(AESTDTC,'(',AESTDY,')','/',AEENDTC,'(',AESTDY,')');
+  col5=aeout;
+  col6=AEREL;
+  col7=AEACN;
+  col8=AESEV;
+  col9=AECONTRT;
+  col10=cats(TRTEMFL,'/',AESER,'/',AEDIS );
+  col11='-';
+run;
+
+
+
+proc sort data=final02;
+  by SUBJID AESTDTC AEENDTC AETERM;
+run;
+
+data tflqc_&tab tflqc.&tab;
+	set final02;
+	keep col1-col10;
+run;
+
+********************************************************
+*  Step 03: Read in rtf file for compare               *
+********************************************************;
+
+%u_read_rtf(rtffile=&SYSROOT.\&prjcode\&subcode\&prtcode\11_output\&rtfName..rtf
+                 ,layout=1
+                 ,clength=
+                 ,charonly=Y
+                 ,wrapn=1
+                 ,last_idcol =
+                 ,dsout=tflprt_&tab
+                 );
+data tflprt_&tab(keep=c1-c10);
+   length c1-c10 $200.;
+   set tflprt_&tab;
+run;
+
+data tflqc_&tab;
+   length col1-col10 $200.;
+   set tflqc_&tab;
+run;
+
+ods csv file="&SYSROOT.\&prjcode\&subcode\&prtcode\20_qc\10_log\qc_&rtfName..txt";
+
+
+title ">>> QC &rtfName..rtf";
+
+
+proc compare base = tflprt_&tab compare = tflqc_&tab out=asas outnoequal outbase outcomp outdiff;
+
+	var     c1   -c10   ;*subjid trtp visit  adt_y PARAM AVALC PEDESC;
+	with    COL1 -col10 ;
+run;
+%let avu_sysinfo=&sysinfo.;
+%avu_dataset_exist_check;
+%avu_tmp_create;
+
+ods csv close;
+
+
+
+
+/* Codes for checking AETERM counts from SDTM and ADaM */
+
+proc freq data=ae02 ;
+ tables aeterm / out=t1;
+run;
+
+proc freq data=adae01 ;
+ tables aeterm /out=t2;
+run;
+
+proc sort data=t1; by aeterm; run;
+proc sort data=t2; by aeterm; run;
+
+data t1_1;
+ set t1(rename =(count=aecnt));
+ label aecnt =SDTM;
+ keep aeterm aecnt;
+run;
+
+data t2_2;
+ set t2(rename =(count=adcnt));
+ keep aeterm adcnt;
+ label adcnt=ADaM;
+run;
+
+data merge2;
+ merge t1_1
+       t2_2;
+ by aeterm;
+run;
+
+/*
+0 受试者编号
+0 剂量组
+0 系统器官分类(SOC)/
+1 首选术语(PT)/
+2 不良事件名称/
+0 开始日期和时间(研究日)/
+1 转归日期和时间(研究日)
+0 AE转归
+0 相关性
+0 采取措施
+0 严重程度
+0 是否有
+1 纠正治疗 
+0 是否TEAE/
+1 是否SAE/
+2 是否导致退出试验
+0 备注
+*/
