@@ -1,0 +1,156 @@
+/**************************************************************
+* CLIENT NAME      : Jiangsu Hengrui
+* PROJECT/STUDY    : SHR-1703-I-101
+* CODE NAME        : 
+* CODE TYPE        : Program
+* FUNCTION         : QC l_adpe
+* DATE             : 2021/07/14
+* PROGRAMMER       : Xiaoxia Zhou
+* SOFTWARE/VERTION : SAS/VERSION 9.4
+**************************************************************/
+
+dm output 'clear';
+dm log 'clear' log;
+
+proc datasets nolist memtype=data kill; quit;
+
+%include "&mcrqc.TFL\qc_mtlf.sas";
+%let tab=l_adpe;
+%let rtfname=l16-02-008-004-adpe;
+
+********************************************************
+*  Step 01:  Preparing dataset                         *
+********************************************************;
+
+/**/
+/*proc contents data=adamprt.adpe; run;*/
+/*proc contents data=sdtmprt.pe; run;*/
+
+
+data adpe01(where=(saffl='Y'));
+  set adamprt.adpe(keep=saffl subjid param trta visit adt adtm aval avalc PEDESC ablfl);
+  dtcm=strip(put(adtm,E8601DT.));
+run;
+
+proc sql noprint;
+  select distinct subjid into: safpop separated by ' ' from adpe01;
+quit;
+%put &safpop;
+
+data pe01;
+
+  set sdtmprt.pe;
+  subjid = scan(usubjid,6,'-');
+  param=petest;
+  if pestat ^= ''  then peorres='未做';
+
+run;
+
+data pe02;
+
+  set pe01;
+  if subjid in (&safpop) then output;
+  keep subjid param visit pedtc PEORRES PEBLFL PESTAT;
+  
+run;
+
+proc sort data=pe02; by subjid visit param; run;
+proc sort data=adpe01; by subjid visit param; run;
+
+data merged;
+
+  merge pe02(in=a)
+        adpe01(in=b);
+  by subjid visit param;
+
+run;
+
+data final(keep=col1-col8);
+
+  length col1-col7 $200.;
+  set merged;
+  col1=param;
+  col2=subjid;
+  col3=trta;
+  col4=visit;
+  col5=pedtc;
+  col6=peorres;
+  col7=pedesc;
+  col8=peblfl;
+
+run;
+
+proc sort data=final; by descending col1 col2 col5; run;
+
+
+********************************************************
+*  Step 02: Alignment with main site programming       *
+********************************************************;
+
+data tflqc_&tab tflqc.&tab;
+  set final;
+  if col8='Y' then col8='是';
+run;
+
+********************************************************
+*  Step 03: Read in rtf file for compare               *
+********************************************************;
+
+
+%u_read_rtf(rtffile=&SYSROOT.\&prjcode\&subcode\&prtcode\11_output\&rtfName..rtf
+                 ,layout=1
+                 ,clength=
+                 ,charonly=Y
+                 ,wrapn=1
+                 ,last_idcol =
+                 ,dsout=tflprt_&tab
+                 );
+
+data tflprt_&tab(keep=c1-c8);
+   length c1-c8 $200.;
+   set tflprt_&tab;
+run;
+
+data tflqc_&tab;
+   length col1-col8 $200.;
+   set tflqc_&tab;
+run;
+
+ods csv file="&SYSROOT.\&prjcode\&subcode\&prtcode\20_qc\10_log\qc_&rtfName..txt";
+
+
+title ">>> QC &rtfName..rtf";
+
+
+proc compare base = tflprt_&tab compare = tflqc_&tab out=asas outnoequal outbase outcomp outdiff;
+
+	var     c1   -c8   ;
+	with    col1 -col8 ;
+run;
+%let avu_sysinfo=&sysinfo.;
+%avu_dataset_exist_check;
+%avu_tmp_create;
+
+ods csv close;
+
+
+/*
+0 检查项目
+0 受试者编号
+0 剂量组
+0 访视
+0 检查日期和时间
+0 检查结果
+0 异常描述
+0 是否基线
+*/
+
+/*proc sort data=adpe01 out=adpe02 nodupkey;*/
+/*  by subjid visit param;*/
+/*run;*/
+/**/
+/*proc sort data=pe02 out=pe03 nodupkey;*/
+/*  by subjid visit param;*/
+/*run;*/
+
+/*16.2.8.4*/
