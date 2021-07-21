@@ -1,0 +1,15 @@
+
+data adeg01(drop=saffl);
+
+  set adamprt.adeg(keep=saffl param  subjid trta visit ADT ABLFL CHG EGDESC AVAL);
+  where saffl='Y' and param in ('PR(ms)','QT(ms)','QTc(ms)','临床意义','心率(次/分)');
+  
+run;
+
+/* Codes for checking duplicate obs */
+proc sql;
+  create table t1 as
+  select * from adeg01
+  group by subjid, visit, param
+  having count(*) >= 2;
+quit;

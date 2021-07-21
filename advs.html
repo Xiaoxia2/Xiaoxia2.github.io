@@ -5,16 +5,20 @@
 <html lang="en">
 
   <header>
-  <title>QC Work with Xiaoyi</title>
+  <title>16.2.8.2 advs </title>
   </header>
 
   <body>
-<h1> </h1>
-<p>Listing #1 <a href="listing1.html" target="_blank">listing 16.2.7.1 adae</a></p>
-<p>Listing #2 <a href="listing2.html" target="_blank">listing 16.2.8.1.1 adlb_hema</a></p>
-<p>Listing #3 <a href="listing3.html" target="_blank">listing 16.2.8.2 advs</a></p>
-<p>Listing #4 <a href="listing4.html" target="_blank">listing 16.2.8.3 adeg</a></p>
-<p>Listing #5 <a href="listing5.html" target="_blank">listing 16.2.8.4 adpe</a></p>
+
+
+<h1> Source data issues (SDTM and ADaM for VS) </h1>
+<p>1. I found issues in advs, variable 'param' should not be missing，unfortunately, I used proc freq it showed there are 208 missing. <a href="refs\param.txt" >click here</a></p>
+<p>2. unsched visit should not contain only numbers(e.g. variable 'visit' have value '10.01', instead it should be sth like 'day10_计划外访视——10.01') <a href="refs\visit.txt" >click here</a></p>
+
+<h2>Reference</h2>
+<p>My QC SAS Code <a href="refs\advs_freq.txt" >click here</a></p>
+
+<<h4>Note: Since the source data(SDTM and ADaM have been changing, issues may disappear or emerge.</h4>>
 
 
   </body>

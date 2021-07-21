@@ -1,0 +1,17 @@
+/* Codes for checking the issues*/
+
+data advs01(where=(saffl='Y'));
+
+  set adamprt.advs(keep=saffl subjid param trta visit adt adtm aval avalc ablfl chg);
+
+run;
+
+
+proc freq data=advs01;
+ tables visit  / out=t1;
+run;
+
+
+proc freq data=advs01;
+ tables param / out=t2;
+run;

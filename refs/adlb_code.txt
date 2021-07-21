@@ -1,0 +1,14 @@
+data adlb_hema01;
+
+  set adamprt.adlb(keep=saffl subjid PARCAT1 param trta visit adt aval avalc ablfl chg ACLSIG BCLSIG LBCOM );
+  where saffl='Y' and strip(PARCAT1)='血常规';
+
+run;
+
+/* code for checking data issues */
+proc sql;
+  create table t1 as
+  select * from adlb_hema01
+  group by subjid, visit, param
+  having count(*) >= 2;
+quit;
